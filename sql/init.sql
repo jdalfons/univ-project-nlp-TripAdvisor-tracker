@@ -1,33 +1,33 @@
 CREATE TABLE IF NOT EXISTS restaurants (
-    restaurant_id SERIAL PRIMARY KEY,
-    restaurant_name VARCHAR(255),
-    restaurant_url VARCHAR(255),
-    restaurant_avg_review FLOAT,
-    restaurant_total_reviews INT,
-    restaurant_price VARCHAR(50),
-    restaurant_type VARCHAR(255),
+    restaurant_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    restaurant_name TEXT,
+    restaurant_url TEXT,
+    restaurant_avg_review REAL,
+    restaurant_total_reviews INTEGER,
+    restaurant_price TEXT,
+    restaurant_type TEXT,
     restaurant_about TEXT
 );
 
 CREATE TABLE IF NOT EXISTS locations (
-    location_id SERIAL PRIMARY KEY,
+    location_id INTEGER PRIMARY KEY AUTOINCREMENT,
     restaurant_id INTEGER NOT NULL,
     address TEXT,
     ville TEXT,
     code_postal TEXT,
     latitude REAL,
     longitude REAL,
-    country VARCHAR(255),
+    country TEXT,
     FOREIGN KEY (restaurant_id) REFERENCES restaurants(restaurant_id)
 );
 
 CREATE TABLE IF NOT EXISTS reviews (
-    review_id SERIAL PRIMARY KEY,
+    review_id INTEGER PRIMARY KEY AUTOINCREMENT,
     restaurant_id INTEGER NOT NULL,
     user_name TEXT,
     review_text TEXT,
-    date DATE,
+    date TEXT,
     contributions INTEGER,
-    rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    rating REAL CHECK (rating BETWEEN 1 AND 5),
     FOREIGN KEY (restaurant_id) REFERENCES restaurants(restaurant_id)
 );

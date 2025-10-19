@@ -4,12 +4,14 @@ This project demonstrates the use of NLP practices by deploying analysis and mod
 
 ## Architecture
 
-A scraper (BeautifulSoup) is used to gather restaurant data from all review pages. These reviews are saved into a PostgreSQL database, which is accessed by a Python backend. The data is then displayed on a Streamlit frontend for analysis. Additionally, an LLM from Mistral AI is used to summarize each restaurant's positive and negative points based on the comments.
+A scraper (BeautifulSoup) is used to gather restaurant data from all review pages. These reviews are saved into a SQLite database file, which is accessed by a Python backend. The data is then displayed on a Streamlit frontend for analysis. Additionally, an LLM from Mistral AI is used to summarize each restaurant's positive and negative points based on the comments.
 
 ![Architecture Diagram](assets/img/architecture.png)
 
 ## DataBase
 The database follows a star schema, dividing locations, reviews, and restaurant information into separate tables. For improvement, consider adding another table for users instead of saving user information in the reviews table.
+
+The default SQLite file is stored at `sql/tripadvisor.db`. When the application starts for the first time it creates the schema and loads the demo dataset using the SQL scripts available in the `sql/` directory.
 
 ![UML](assets/img/nlp_sql_uml.png)
 
@@ -24,17 +26,14 @@ You can configure the API keys in two ways:
 Docker will take local variables from your environment file or machine. You can configure it using an `.env` file like the following:
 
 ```sh
-DB=postgres
-POSTGRES_HOST=localhost
-POSTGRES_USER=nlp
-POSTGRES_PASSWORD=nlp
-POSTGRES_DBNAME=nlp
-POSTGRES_PORT=32001
+SQLITE_PATH=sql/tripadvisor.db
 
 MISTRAL_URL=http://mistralservice:8501
 MISTRAL_API_KEY=${MISTRAL_API_KEY}
 GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
 ```
+
+`SQLITE_PATH` can be an absolute path or a relative path inside the project. When the file is missing, the application will create it automatically and seed it with the demo dataset.
 
 ### 2. Direct Modification
 
@@ -43,6 +42,7 @@ Before starting, you need API keys from different services. Follow the steps bel
 Ensure your `docker-compose` file includes the following environment variables:
 ```yaml
 environment:
+    - SQLITE_PATH=/app/sql/tripadvisor.db
     - MISTRAL_API_KEY=${MISTRAL_API_KEY}
     - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
 ```
@@ -80,7 +80,7 @@ environment:
     ```
 
 4. **Access the web application:**
-    The application will be available at `http://localhost:8052`
+    The application will be available at `http://localhost:8502`
 
 5. **Close the Docker Image**
    When you are done with the webb app, you can do this command on your terminal.
