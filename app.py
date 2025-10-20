@@ -7,9 +7,9 @@ from views.home import home_page
 from views.llm import llm_page
 from views.restaurants import restaurant_page
 from views.map import map_page
-import psycopg2
-import os
-import pandas as pd
+# import psycopg2
+# import os
+# import pandas as pd
 
 APP_TITLE = "TripAdvisor Scraper NLP"
 
