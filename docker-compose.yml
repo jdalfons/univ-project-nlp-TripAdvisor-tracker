@@ -1,26 +1,6 @@
 version: '3'
 
 services:
-  postgres:
-    container_name: nlpDBPostgres
-    image: postgres:latest
-    ports:
-        - "32001:5432"
-    environment:
-        POSTGRES_DB: nlp
-        POSTGRES_USER: nlp
-        POSTGRES_PASSWORD: nlp
-    volumes:
-      - ./sql/init.sql:/docker-entrypoint-initdb.d/01_init.sql
-      - ./sql/set_restaurants.sql:/docker-entrypoint-initdb.d/02_set_restaurants.sql
-      - ./sql/set_locations.sql:/docker-entrypoint-initdb.d/03set_locations.sql
-      - ./sql/set_reviews.sql:/docker-entrypoint-initdb.d/04set_reviews.sql
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nlp"]
-      interval: 10s
-      timeout: 5s
-      retries: 5  
-
   client:
     image: nlp-tripadvisor-client
     build:
@@ -30,12 +10,9 @@ services:
       - "8502:8502"
     environment:
       DOCKER_ENV: true
-      POSTGRES_HOST: postgres
-      POSTGRES_USER: nlp
-      POSTGRES_PASSWORD: nlp
-      POSTGRES_DBNAME: nlp
-      POSTGRES_PORT: 5432
-      SQLITE_PATH: path/to/tripadvisor.db
+      SQLITE_PATH: /app/restaurants.db
       MISTRAL_URL: http://mistralservice:8501
       MISTRAL_API_KEY: ${MISTRAL_API_KEY}
       GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+    volumes:
+      - ./:/app

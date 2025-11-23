@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS restaurants (
-    restaurant_id SERIAL PRIMARY KEY,
+    restaurant_id INTEGER PRIMARY KEY,
     restaurant_name VARCHAR(255),
     restaurant_url VARCHAR(255),
     restaurant_avg_review FLOAT,
@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS restaurants (
 );
 
 CREATE TABLE IF NOT EXISTS locations (
-    location_id SERIAL PRIMARY KEY,
+    location_id INTEGER PRIMARY KEY,
     restaurant_id INTEGER NOT NULL,
     address TEXT,
     ville TEXT,
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS locations (
 );
 
 CREATE TABLE IF NOT EXISTS reviews (
-    review_id SERIAL PRIMARY KEY,
+    review_id INTEGER PRIMARY KEY,
     restaurant_id INTEGER NOT NULL,
     user_name TEXT,
     review_text TEXT,
