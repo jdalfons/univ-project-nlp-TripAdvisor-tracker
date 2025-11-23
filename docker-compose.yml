@@ -10,9 +10,9 @@ services:
       - "8502:8502"
     environment:
       DOCKER_ENV: true
-      SQLITE_PATH: /app/sql/tripadvisor.db
+      SQLITE_PATH: /app/restaurants.db
       MISTRAL_URL: http://mistralservice:8501
       MISTRAL_API_KEY: ${MISTRAL_API_KEY}
       GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
     volumes:
-      - ./sql:/app/sql
+      - ./:/app

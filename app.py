@@ -1,15 +1,16 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
 from utils.db import (
-    get_downloaded_restaurants)
+    get_downloaded_restaurants,
+    init_db
+)
 from views.analytics import analytics_page
 from views.home import home_page
 from views.llm import llm_page
 from views.restaurants import restaurant_page
 from views.map import map_page
-# import psycopg2
-# import os
-# import pandas as pd
+import os
+import pandas as pd
 
 APP_TITLE = "TripAdvisor Scraper NLP"
 
@@ -31,6 +32,7 @@ with st.sidebar:
         # orientation="horizontal",
     )
 
+init_db()
 df_downloaded_restaurants = get_downloaded_restaurants()
 
 if selected == "Accueil":

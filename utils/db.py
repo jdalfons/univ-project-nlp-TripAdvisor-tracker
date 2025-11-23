@@ -1,126 +1,83 @@
 import os
 import platform
 import sqlite3
-from pathlib import Path
-
 import pandas as pd
 from dotenv import load_dotenv
 
 if platform.system() == "Windows":
-    dotenv_path = Path(__file__).resolve().parent / ".env"
+    # Specify the path to your .env file
+    dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+    # Load the .env file
     load_dotenv(dotenv_path)
 else:
     load_dotenv()
 
-BASE_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_DB_PATH = BASE_DIR / "sql" / "tripadvisor.db"
+# Get SQLite DB path from environment variable or default
+DB_PATH = os.environ.get("SQLITE_PATH", "restaurants.db")
 
-
-def resolve_sqlite_path() -> Path:
-    """Resolve the SQLite database path from the environment or defaults."""
-    raw_path = os.environ.get("SQLITE_PATH")
-    if raw_path:
-        candidate = Path(raw_path).expanduser()
-        if not candidate.is_absolute():
-            candidate = BASE_DIR / candidate
-    else:
-        candidate = DEFAULT_DB_PATH
-
-    candidate.parent.mkdir(parents=True, exist_ok=True)
-    return candidate
-
-
-def run_sql_script(connection: sqlite3.Connection, script_path: Path) -> None:
-    """Execute a SQL script if it exists."""
-    if not script_path.exists():
-        print(f"SQL script not found: {script_path}")
-        return
-
+def get_db_connection():
+    """
+    Establish a connection to the SQLite database.
+    """
     try:
-        with script_path.open("r", encoding="utf-8") as sql_file:
-            connection.executescript(sql_file.read())
-        connection.commit()
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row  # Access columns by name
+        return conn
     except sqlite3.Error as err:
-        print(f"Error executing {script_path.name}: {err}")
-
-
-def table_exists(connection: sqlite3.Connection, table_name: str) -> bool:
-    """Check if a table exists in the SQLite database."""
-    try:
-        cursor = connection.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-            (table_name,),
-        )
-        return cursor.fetchone() is not None
-    except sqlite3.Error as err:
-        print(f"Error checking table {table_name}: {err}")
-        return False
-
-
-def seed_table(connection: sqlite3.Connection, table_name: str, script_name: str) -> None:
-    """Populate a table from a SQL script if it is empty."""
-    if not table_exists(connection, table_name):
-        return
-
-    try:
-        cursor = connection.execute(f"SELECT COUNT(*) FROM {table_name}")
-        row = cursor.fetchone()
-        count = row[0] if row else 0
-    except sqlite3.Error as err:
-        print(f"Error reading {table_name} row count: {err}")
-        return
-
-    if count == 0:
-        scripts_dir = BASE_DIR / "sql"
-        run_sql_script(connection, scripts_dir / script_name)
-
-
-def initialize_database(connection: sqlite3.Connection) -> None:
-    """Ensure the SQLite database schema and demo data are available."""
-    try:
-        connection.execute("PRAGMA foreign_keys = ON;")
-    except sqlite3.Error as err:
-        print(f"Error enabling foreign keys: {err}")
-
-    scripts_dir = BASE_DIR / "sql"
-    run_sql_script(connection, scripts_dir / "init.sql")
-
-    # Seed demo data if the tables are empty
-    seed_table(connection, "restaurants", "set_restaurants.sql")
-    seed_table(connection, "locations", "set_locations.sql")
-    seed_table(connection, "reviews", "set_reviews.sql")
-
-
-try:
-    DB_PATH = resolve_sqlite_path()
-    db = sqlite3.connect(
-        DB_PATH,
-        detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
-        check_same_thread=False,
-    )
-    db.row_factory = sqlite3.Row
-    initialize_database(db)
-except sqlite3.Error as err:
-    print(f"Database connection error: {err}")
-    db = None
-
+        print(f"Database connection error: {err}")
+        return None
 
 def get_cursor():
     """
     Validate and obtain a cursor for database operations.
-
-    Returns:
-        cursor: A database cursor.
+    Note: In SQLite, we usually use the connection object to create a cursor.
+    This function now returns (connection, cursor) or just cursor depending on usage,
+    but to keep compatibility with existing code structure, we'll return a cursor 
+    that is bound to a connection. However, we need to be careful about closing connections.
+    
+    Better approach for this refactor: Helper functions create their own connection/cursor.
+    But to minimize changes, let's try to adapt.
     """
-    if db is None:
-        return None
+    conn = get_db_connection()
+    if conn:
+        return conn.cursor()
+    return None
 
-    try:
-        return db.cursor()
-    except sqlite3.Error as err:
-        print(f"Error obtaining cursor: {err}")
-        return None
-
+def init_db():
+    """
+    Initialize the SQLite database with tables and data if it doesn't exist.
+    """
+    if not os.path.exists(DB_PATH) or os.path.getsize(DB_PATH) == 0:
+        print("Initializing database...")
+        conn = get_db_connection()
+        if conn is None:
+            return
+        
+        try:
+            cursor = conn.cursor()
+            
+            # List of SQL files to execute in order
+            sql_files = [
+                'sql/init.sql',
+                'sql/set_restaurants.sql',
+                'sql/set_locations.sql',
+                'sql/set_reviews.sql'
+            ]
+            
+            for sql_file in sql_files:
+                print(f"Executing {sql_file}...")
+                with open(sql_file, 'r') as f:
+                    sql_script = f.read()
+                    cursor.executescript(sql_script)
+            
+            conn.commit()
+            print("Database initialized successfully.")
+        except Exception as e:
+            print(f"Error initializing database: {e}")
+        finally:
+            conn.close()
+    else:
+        print("Database already exists.")
 
 def get_all_reviews():
     """
@@ -129,19 +86,17 @@ def get_all_reviews():
     Returns:
         pd.DataFrame: DataFrame containing all reviews.
     """
-    cursor = get_cursor()
-    if cursor is None:
+    conn = get_db_connection()
+    if conn is None:
         return pd.DataFrame()
-
     try:
-        cursor.execute("SELECT * FROM reviews")
-        reviews = cursor.fetchall()
+        reviews = conn.execute("SELECT * FROM reviews").fetchall()
         return pd.DataFrame([dict(review) for review in reviews])
     except sqlite3.Error as err:
         print(err)
         return pd.DataFrame()
     finally:
-        cursor.close()
+        conn.close()
 
 
 def get_all_restaurants():
@@ -151,19 +106,17 @@ def get_all_restaurants():
     Returns:
         pd.DataFrame: DataFrame containing all restaurants.
     """
-    cursor = get_cursor()
-    if cursor is None:
+    conn = get_db_connection()
+    if conn is None:
         return pd.DataFrame()
-
     try:
-        cursor.execute("SELECT * FROM restaurants")
-        restaurants = cursor.fetchall()
+        restaurants = conn.execute("SELECT * FROM restaurants").fetchall()
         return pd.DataFrame([dict(restaurant) for restaurant in restaurants])
     except sqlite3.Error as err:
         print(err)
         return pd.DataFrame()
     finally:
-        cursor.close()
+        conn.close()
 
 
 def get_restaurant_by_type(restaurant_type):
@@ -176,22 +129,20 @@ def get_restaurant_by_type(restaurant_type):
     Returns:
         pd.DataFrame: DataFrame containing restaurants of the specified type.
     """
-    cursor = get_cursor()
-    if cursor is None:
+    conn = get_db_connection()
+    if conn is None:
         return pd.DataFrame()
-
     try:
-        cursor.execute(
+        restaurants = conn.execute(
             "SELECT * FROM restaurants WHERE restaurant_type = ?",
-            (restaurant_type,),
-        )
-        restaurants = cursor.fetchall()
+            (restaurant_type,)
+        ).fetchall()
         return pd.DataFrame([dict(restaurant) for restaurant in restaurants])
     except sqlite3.Error as err:
         print(err)
         return pd.DataFrame()
     finally:
-        cursor.close()
+        conn.close()
 
 
 def get_reviews_info_by_restaurant(restaurant_id):
@@ -204,30 +155,28 @@ def get_reviews_info_by_restaurant(restaurant_id):
     Returns:
         pd.DataFrame: DataFrame containing summary of reviews for the specified restaurant.
     """
-    cursor = get_cursor()
-    if cursor is None:
+    conn = get_db_connection()
+    if conn is None:
         return pd.DataFrame()
-
     try:
-        cursor.execute(
+        review_summary = conn.execute(
             """
-            SELECT
-                COUNT(*) AS review_count,
-                AVG(rating) AS average_rating,
-                MAX(date) AS last_comment_date,
-                MIN(date) AS first_comment_date
-            FROM reviews
+            SELECT 
+                COUNT(*) AS review_count, 
+                AVG(rating) AS average_rating, 
+                MAX(date) AS last_comment_date, 
+                MIN(date) AS first_comment_date 
+            FROM reviews 
             WHERE restaurant_id = ?
             """,
-            (int(restaurant_id),),
-        )
-        review_summary = cursor.fetchall()
+            (int(restaurant_id),)
+        ).fetchall()
         return pd.DataFrame([dict(summary) for summary in review_summary])
     except sqlite3.Error as err:
         print(err)
         return pd.DataFrame()
     finally:
-        cursor.close()
+        conn.close()
 
 
 def save_reviews_to_db(restaurant_id, reviews):
@@ -238,50 +187,27 @@ def save_reviews_to_db(restaurant_id, reviews):
         restaurant_id (int): The ID of the restaurant.
         reviews (list): List of reviews to save.
     """
-    if not reviews:
+    conn = get_db_connection()
+    if conn is None:
         return
-
-    cursor = get_cursor()
-    if cursor is None:
-        return
-
     try:
-        cursor.executemany(
-            """
-            INSERT INTO reviews (restaurant_id, user_name, review_text, date, contributions, rating)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            [
+        cursor = conn.cursor()
+        for review in reviews:
+            cursor.execute(
+                """
+                INSERT INTO reviews (restaurant_id, user_name, review_text, date, contributions, rating)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
                 (
-                    restaurant_id,
-                    review.get("user_name"),
-                    review.get("review_text"),
-                    review.get("date"),
-                    review.get("contributions"),
-                    review.get("rating"),
+                    restaurant_id, review['user_name'], review['review_text'],
+                    review['date'], review['contributions'], review['rating']
                 )
-                for review in reviews
-            ],
-        )
-        db.commit()
+            )
+        conn.commit()
     except sqlite3.Error as err:
         print(err)
     finally:
-        cursor.close()
-
-
-def _to_float(value):
-    try:
-        return float(value) if value is not None else None
-    except (TypeError, ValueError):
-        return None
-
-
-def _to_int(value):
-    try:
-        return int(value) if value is not None else None
-    except (TypeError, ValueError):
-        return None
+        conn.close()
 
 
 def save_restaurant_to_db(restaurant_data):
@@ -291,86 +217,60 @@ def save_restaurant_to_db(restaurant_data):
     Args:
         restaurant_data (dict): Dictionary containing restaurant data.
     """
-    cursor = get_cursor()
-    if cursor is None:
+    conn = get_db_connection()
+    if conn is None:
         return
 
     try:
-        restaurant_name = restaurant_data.get("restaurant_name")
-        restaurant_avg_review = _to_float(restaurant_data.get("restaurant_avg_review"))
-        restaurant_price = restaurant_data.get("restaurant_price")
-        restaurant_reviews = _to_int(restaurant_data.get("restaurant_reviews"))
-        restaurant_type_resto = restaurant_data.get("restaurant_type_resto")
-        restaurant_url = restaurant_data.get("restaurant_url")
-        restaurant_about = restaurant_data.get("restaurant_about")
+        cursor = conn.cursor()
+        # Clean and format data
+        restaurant_name = restaurant_data["restaurant_name"]
+        restaurant_avg_review = float(restaurant_data["restaurant_avg_review"])
+        restaurant_price = restaurant_data["restaurant_price"]
+        restaurant_reviews = int(restaurant_data["restaurant_reviews"])
+        restaurant_type_resto = restaurant_data["restaurant_type_resto"]
+        restaurant_url = restaurant_data["restaurant_url"]
 
-        address_info = restaurant_data.get("restauranta_address") or {}
-        address = address_info.get("address")
-        latitude = _to_float(address_info.get("latitude"))
-        longitude = _to_float(address_info.get("longitude"))
-        zip_code = address_info.get("zip_code")
-        country = address_info.get("country")
-        ville = address_info.get("ville")
+        address = restaurant_data["restauranta_address"]["address"]
+        latitude = float(restaurant_data["restauranta_address"]["latitude"])
+        longitude = float(restaurant_data["restauranta_address"]["longitude"])
+        zip_code = restaurant_data["restauranta_address"]["zip_code"]
+        country = restaurant_data["restauranta_address"]["country"]
+        ville = restaurant_data["restauranta_address"]["ville"]
 
+        # Insert restaurant data
         cursor.execute(
             """
-            INSERT INTO restaurants (
-                restaurant_name,
-                restaurant_avg_review,
-                restaurant_price,
-                restaurant_total_reviews,
-                restaurant_type,
-                restaurant_url,
-                restaurant_about
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO restaurants (restaurant_name, restaurant_avg_review, restaurant_price, restaurant_total_reviews, restaurant_type, restaurant_url)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (
-                restaurant_name,
-                restaurant_avg_review,
-                restaurant_price,
-                restaurant_reviews,
-                restaurant_type_resto,
-                restaurant_url,
-                restaurant_about,
-            ),
+            (restaurant_name, restaurant_avg_review, restaurant_price, restaurant_reviews, restaurant_type_resto, restaurant_url)
         )
         restaurant_id = cursor.lastrowid
 
+        # Insert location data
         cursor.execute(
             """
             INSERT INTO locations (restaurant_id, address, latitude, longitude, code_postal, ville, country)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (
-                restaurant_id,
-                address,
-                latitude,
-                longitude,
-                zip_code,
-                ville,
-                country,
-            ),
+            (restaurant_id, address, latitude, longitude, zip_code, ville, country)
         )
 
-        db.commit()
-
-        return pd.DataFrame([
-            {
-                "restaurant_id": restaurant_id,
-                "restaurant_name": restaurant_name,
-                "restaurant_avg_review": restaurant_avg_review,
-                "restaurant_price": restaurant_price,
-                "restaurant_total_reviews": restaurant_reviews,
-                "restaurant_type": restaurant_type_resto,
-                "restaurant_url": restaurant_url,
-            }
-        ])
+        conn.commit()
+        return pd.DataFrame([{
+            "restaurant_id": restaurant_id,
+            "restaurant_name": restaurant_name,
+            "restaurant_avg_review": restaurant_avg_review,
+            "restaurant_price": restaurant_price,
+            "restaurant_total_reviews": restaurant_reviews,
+            "restaurant_type": restaurant_type_resto,
+            "restaurant_url": restaurant_url
+        }])
     except sqlite3.Error as err:
         print(err)
     finally:
-        cursor.close()
-
+        conn.close()
 
 def delete_reviews_by_restaurant_id(restaurant_id):
     """
@@ -379,22 +279,21 @@ def delete_reviews_by_restaurant_id(restaurant_id):
     Args:
         restaurant_id (int): The ID of the restaurant.
     """
-    cursor = get_cursor()
-    if cursor is None:
+    conn = get_db_connection()
+    if conn is None:
         return
-
     try:
-        cursor.execute(
+        conn.execute(
             "DELETE FROM reviews WHERE restaurant_id = ?",
-            (restaurant_id,),
+            (restaurant_id,)
         )
-        db.commit()
+        conn.commit()
     except sqlite3.Error as err:
         print(err)
     finally:
-        cursor.close()
-
-
+        conn.close()
+        
+        
 def restaurant_exists(restaurant_url):
     """
     Check if a restaurant exists in the database by its URL.
@@ -405,22 +304,20 @@ def restaurant_exists(restaurant_url):
     Returns:
         bool: True if the restaurant exists, False otherwise.
     """
-    cursor = get_cursor()
-    if cursor is None:
+    conn = get_db_connection()
+    if conn is None:
         return False
-
     try:
-        cursor.execute(
+        cursor = conn.execute(
             "SELECT 1 FROM restaurants WHERE restaurant_url = ?",
-            (restaurant_url,),
+            (restaurant_url,)
         )
         return cursor.fetchone() is not None
     except sqlite3.Error as err:
         print(err)
         return False
     finally:
-        cursor.close()
-
+        conn.close()
 
 def get_downloaded_restaurants():
     """
@@ -429,38 +326,34 @@ def get_downloaded_restaurants():
     Returns:
         pd.DataFrame: DataFrame containing downloaded restaurants.
     """
-    cursor = get_cursor()
-    if cursor is None:
+    conn = get_db_connection()
+    if conn is None:
         return pd.DataFrame()
-
     try:
-        cursor.execute(
-            """
+        restaurants = conn.execute("""
             SELECT r.restaurant_id,
                 r.restaurant_name,
                 r.restaurant_avg_review,
                 r.restaurant_price,
-                r.restaurant_type,
+                r.restaurant_type, 
                 r.restaurant_total_reviews,
                 r.restaurant_url,
                 r.restaurant_about,
                 l.address,
-                l.latitude,
+                l.latitude, 
                 l.longitude,
                 l.country,
                 l.ville
             FROM restaurants r
             JOIN locations l ON r.restaurant_id = l.restaurant_id
             WHERE r.restaurant_id IN (SELECT restaurant_id FROM reviews)
-            """
-        )
-        restaurants = cursor.fetchall()
+        """).fetchall()
         return pd.DataFrame([dict(restaurant) for restaurant in restaurants])
     except sqlite3.Error as err:
         print(err)
         return pd.DataFrame()
     finally:
-        cursor.close()
+        conn.close()
 
 
 def get_restaurant_by_id(restaurant_ids):
@@ -473,17 +366,14 @@ def get_restaurant_by_id(restaurant_ids):
     Returns:
         pd.DataFrame: DataFrame containing restaurants with the specified IDs.
     """
-    if not restaurant_ids:
+    conn = get_db_connection()
+    if conn is None:
         return pd.DataFrame()
-
-    cursor = get_cursor()
-    if cursor is None:
-        return pd.DataFrame()
-
     try:
-        placeholders = ",".join(["?"] * len(restaurant_ids))
+        # SQLite doesn't support %s list expansion directly like psycopg2
+        placeholders = ','.join(['?'] * len(restaurant_ids))
         query = f"""
-            SELECT
+            SELECT 
                 r.restaurant_id,
                 r.restaurant_name,
                 r.restaurant_avg_review,
@@ -493,20 +383,19 @@ def get_restaurant_by_id(restaurant_ids):
                 l.longitude,
                 r2.rating,
                 r2.review_text,
-                r2.contributions
+                r2.contributions 
             FROM restaurants r
             JOIN locations l ON l.restaurant_id = r.restaurant_id
-            JOIN reviews r2 ON r2.restaurant_id = r.restaurant_id
+            JOIN reviews r2 ON r2.restaurant_id = r.restaurant_id 
             WHERE r.restaurant_id IN ({placeholders})
         """
-        cursor.execute(query, restaurant_ids)
-        restaurants = cursor.fetchall()
+        restaurants = conn.execute(query, restaurant_ids).fetchall()
         return pd.DataFrame([dict(restaurant) for restaurant in restaurants])
     except sqlite3.Error as err:
         print(err)
         return pd.DataFrame()
     finally:
-        cursor.close()
+        conn.close()
 
 
 def get_reviews_one_restaurant(id):
@@ -519,19 +408,17 @@ def get_reviews_one_restaurant(id):
     Returns:
         pd.DataFrame: DataFrame containing reviews for the specified restaurant.
     """
-    cursor = get_cursor()
-    if cursor is None:
+    conn = get_db_connection()
+    if conn is None:
         return pd.DataFrame()
-
     try:
-        cursor.execute(
+        reviews = conn.execute(
             "SELECT * FROM reviews WHERE restaurant_id = ?",
-            (int(id),),
-        )
-        reviews = cursor.fetchall()
+            (int(id),)
+        ).fetchall()
         return pd.DataFrame([dict(review) for review in reviews])
     except sqlite3.Error as err:
         print(err)
         return pd.DataFrame()
     finally:
-        cursor.close()
+        conn.close()

@@ -2,7 +2,6 @@ import streamlit as st
 from utils.db import get_downloaded_restaurants
 import folium
 from streamlit_folium import folium_static
-from folium.plugins import HeatMap
 
 # Define a function to get color based on average review
 def get_color(avg_review):
@@ -47,10 +46,6 @@ def map_page(df):
         popup=folium.Popup(popup_content, max_width=300),
         icon=folium.Icon(color=get_color(row['restaurant_avg_review']))
         ).add_to(m)
-
-    # Add heatmap for sections with best califications
-    heat_data = [[row['latitude'], row['longitude']] for _, row in filtered_df.iterrows() if row['restaurant_avg_review'] >= 4]
-    HeatMap(heat_data).add_to(m)
 
     # Display the map
     folium_static(m)
