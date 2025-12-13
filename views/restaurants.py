@@ -3,6 +3,7 @@
 import time
 import random
 import re
+import requests
 import streamlit as st
 from utils.tripAdvisorScraper import TripAdvisorSpecificRestaurantScraper
 from utils.db import (
@@ -29,7 +30,7 @@ def verify_url(url):
     
 def scrape_restaurant_reviews(scraper, url, total_reviews_expected):
     """Scraper tous les avis pour un restaurant spécifique et afficher la progression dans Streamlit."""
-    scraper.fetch_page(url)
+    per.fetch_page(url)
     reviews = []
     page = 1
     tries = 0
@@ -51,7 +52,7 @@ def scrape_restaurant_reviews(scraper, url, total_reviews_expected):
             reviews.append(scraper.parse_review(card))
         scraper.url = scraper.get_next_url()
         if scraper.url:
-            scraper.fetch_page(scraper.url)
+                scraper.fetch_page(scraper.url)
         page += 1
         progress_bar.progress(min(page / total_pages, 1.0))
         status_text.text(f"Scraping page {page} sur {total_pages}")

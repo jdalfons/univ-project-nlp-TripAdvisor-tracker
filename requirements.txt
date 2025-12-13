@@ -115,3 +115,8 @@ websocket-client==1.8.0
 widgetsnbextension==4.0.13
 nrclex
 wordcloud
+langchain
+langchain-mistralai
+faiss-cpu
+langchain_community
+langchain-text-splitters

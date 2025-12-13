@@ -1,0 +1,37 @@
+/* Global Styles */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Open+Sans:wght@400;600&display=swap');
+
+:root {
+    --primary-color: #00AA6C;
+    /* TripAdvisor Green */
+    --secondary-color: #34E0A1;
+    --background-color: #f0f2f5;
+    --text-color: #333;
+    --header-bg: #fff;
+}
+
+body {
+    font-family: 'Open Sans', sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+}
+
+h1,
+h2,
+h3 {
+    font-family: 'Montserrat', sans-serif;
+    color: #000;
+}
+
+/* Option Menu Customization */
+.nav-link-selected {
+    background-color: var(--primary-color) !important;
+}
+
+/* Card Styling for Content */
+.css-1r6slb0 {
+    background-color: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
