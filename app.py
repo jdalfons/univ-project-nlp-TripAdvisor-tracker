@@ -8,7 +8,6 @@ from views.analytics import analytics_page
 from views.home import home_page
 from views.llm import llm_page
 from views.restaurants import restaurant_page
-from views.map import map_page
 import os
 import pandas as pd
 import base64
@@ -34,12 +33,15 @@ df_downloaded_restaurants = get_downloaded_restaurants()
 
 with st.sidebar:
     st.image("assets/img/Tripadvisor Icon_full.png")
+    
+    # KPIs in Sidebar
+    st.metric("Restaurants Scrappés", len(df_downloaded_restaurants))
 
     # Sidebar Menu
     selected = option_menu(
         menu_title=None,
-        options=["Accueil", "Restaurants", "Analytiques", "LLM", "Carte"],
-        icons=["house", "shop", "bar-chart", "robot", "map"],
+        options=["Accueil", "Restaurants", "Analytiques", "LLM"],
+        icons=["house", "shop", "bar-chart", "robot"],
         default_index=0,
         styles={
             "container": {"padding": "0!important", "background-color": "transparent"},
@@ -57,6 +59,4 @@ elif selected == "Analytiques":
     analytics_page(df_downloaded_restaurants)
 elif selected == "Restaurants":
     restaurant_page(df_downloaded_restaurants)
-elif selected == "Carte":
-    map_page(df_downloaded_restaurants)
 

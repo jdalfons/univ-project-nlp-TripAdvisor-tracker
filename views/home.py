@@ -7,29 +7,46 @@ def home_page():
     """
     Renders the Home page.
     """
-    st.markdown("### 🏠 Accueil")
-
+    st.title("TripAdvisor NLP Explorer 🚀")
+    
     st.markdown(
         """
-        Cette application a pour objectif d'analyser les avis des restaurants de TripAdvisor en utilisant des techniques de traitement du langage naturel (NLP).
-        Voici les principales fonctionnalités de l'application :
-
-        - **Scraper** : Récupérez les données des restaurants directement depuis TripAdvisor.
-        - **Analyse** : Comparez les restaurants en fonction de leurs avis, notes et types de cuisine.
-        - **LLM** : Utilisez un modèle de langage large (LLM) pour résumer les avis des restaurants.
-        - **Carte** : Visualisez les restaurants sur une carte interactive.
-
-        L'application est construite avec Streamlit et utilise diverses bibliothèques Python pour le scraping, l'analyse des données et la visualisation.
-
-        **Technologies utilisées :**
-        - Scraping : BeautifulSoup
-        - Base de données : PostgreSQL
-        - Modèles NLP : Word2Vec, TextBlob, NRCLex
-        - LLM : Mistral API (ministral-8b-latest)
-        - Interface utilisateur : Streamlit
-
-        Ce projet a été réalisé par Juan Diego Alfonso, Cyril Kocab et Maxence Liogier dans le cadre du cours de NLP du Master 2 SISE.
-
-        Nous espérons que cette application vous sera utile pour explorer et analyser les avis des restaurants de manière efficace et intuitive.
-        """
+        <div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; margin-bottom: 25px;">
+            <p style="font-size: 18px; color: #31333F;">
+                Bienvenue sur votre tableau de bord intelligent. Cet outil exploite la puissance du 
+                <strong>Traitement du Langage Naturel (NLP)</strong> pour transformer les avis clients en insights stratégiques.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
+
+    st.subheader("Fonctionnalités Principales")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("### 🏪 Restaurants")
+        st.info("Consultez des fiches détaillées, localisez les établissements sur la carte et téléchargez de nouveaux avis en temps réel.")
+    
+    with col2:
+        st.markdown("### 📊 Analytics")
+        st.success("Visualisez les tendances de sentiment, explorez les nuages de mots et identifiez les points forts/faibles via les KPI.")
+
+    with col3:
+        st.markdown("### 🤖 Assistant IA")
+        st.warning("Interrogez notre LLM pour obtenir des résumés instantanés, des comparaisons et des réponses précises sur les avis.")
+
+    st.divider()
+
+    with st.expander("ℹ️ À propos du projet"):
+        st.markdown(
+            """
+            **Moteur Technique :**
+            - **Scraping** : Extraction massive via Beautiful Soup.
+            - **NLP** : Analyse de sentiment (TextBlob), Émotions (NRCLex), Vectorisation (Word2Vec).
+            - **IA** : Intégration de modèles génératifs (Mistral API).
+            
+            *Réalisé par Juan Diego Alfonso, Cyril Kocab et Maxence Liogier - Master 2 SISE.*
+            """
+        )

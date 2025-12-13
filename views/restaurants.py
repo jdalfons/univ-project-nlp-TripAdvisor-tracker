@@ -94,44 +94,103 @@ def download_restaurant_data(df):
             st.write(log)
 
 
+    
+def get_color(avg_review):
+    if (avg_review >= 4):
+        return 'green'
+    elif (avg_review >= 3):
+        return 'orange'
+    else:
+        return 'red'
+
 def restaurant_page(df):
     """
     Page Streamlit pour scraper les données des restaurants TripAdvisor.
     """
 
-    st.title("Information des Restaurants")
+    st.title("Fiche Restaurant & Recueil de Données")
 
-    tab1, tab2 = st.tabs(["ℹ️ Info Restaurant", "⬇️ Télécharger Restaurant"])
+    tab1, tab2 = st.tabs(["📄 Résumé & Carte", "⬇️ Télécharger / Scraper"])
 
     with tab1:
         restaurant_name = st.selectbox("Sélectionner un restaurant", df["restaurant_name"].unique())
-        tab_info1, tab_info2 = st.tabs(["Info", "Mettre à jour"])
         
-        with tab_info1:
-            
-            st.write(f"### Informations sur le restaurant {restaurant_name}")
-            col1, col2 = st.columns(2)
+        if restaurant_name:
             filtered_df = df[df["restaurant_name"] == restaurant_name]
-            with col1:
-                st.subheader("Restaurant Information")
-                restaurant_info_dict = filtered_df.to_dict(orient='records')[0]
-                st.write(f"**Nom du Restaurant:** {restaurant_info_dict['restaurant_name']}")
-                st.write(f"**Prix du Restaurant:** {restaurant_info_dict['restaurant_price']}")
-                st.markdown(f'<p><a href="https://www.tripadvisor.fr/{restaurant_info_dict["restaurant_url"]}" target="_blank">Visiter sur TripAdvisor</a></p>', unsafe_allow_html=True)
-                st.write(f"**Type de Restaurant:** {restaurant_info_dict['restaurant_type']}")
-                st.write(f"**Adresse:** {restaurant_info_dict['address']}")
+            restaurant_data = filtered_df.iloc[0]
+            restaurant_id = restaurant_data["restaurant_id"]
             
-            with col2:
-                restaurant_id = filtered_df.iloc[0]["restaurant_id"]
-                st.subheader("Reviews Information")
-                reviews_info = get_reviews_info_by_restaurant(restaurant_id)
-                st.write(f"**Reviews scraped:** {reviews_info['review_count'].iloc[0]}")
-                st.write(f"**Average Rating:** {reviews_info['average_rating'].iloc[0]:.1f}")
-                st.write(f"**First Comment Date:** {reviews_info['first_comment_date'].iloc[0]}")
-                st.write(f"**Last Comment Date:** {reviews_info['last_comment_date'].iloc[0]}")
-            st.subheader("À propos du Restaurant")  
-            st.write(f"{restaurant_info_dict['restaurant_about']}")
-            with tab_info2:
+            # Fetch reviews info
+            reviews_info = get_reviews_info_by_restaurant(restaurant_id)
+            if not reviews_info.empty:
+                avg_rating = reviews_info['average_rating'].iloc[0]
+                review_count = reviews_info['review_count'].iloc[0]
+            else:
+                avg_rating = restaurant_data['restaurant_avg_review']
+                review_count = restaurant_data['restaurant_total_reviews']
+
+            # --- HEADER SECTION ---
+            st.markdown(f"## {restaurant_name}")
+            col_h1, col_h2, col_h3 = st.columns([1, 1, 2])
+            with col_h1:
+                st.metric("Note Moyenne", f"{avg_rating:.1f}/5")
+            with col_h2:
+                 st.metric("Total Avis", review_count)
+            with col_h3:
+                st.info(f"💰 Prix: {restaurant_data['restaurant_price']} | 🍽️ Type: {restaurant_data['restaurant_type']}")
+
+            st.divider()
+
+            # --- MAIN CONTENT: MAP & DETAILS ---
+            # Adjusted ratio to make map smaller and details wider
+            col_map, col_details = st.columns([3, 2])
+
+            with col_map:
+                st.subheader("📍 Localisation")
+                # Map logic
+                lat = restaurant_data['latitude']
+                lon = restaurant_data['longitude']
+                
+                m = folium.Map(location=[lat, lon], zoom_start=15, tiles='cartodb positron')
+                
+                popup_content = f"""
+                <div style="font-family: sans-serif;">
+                    <h5>{restaurant_name}</h5>
+                    <p><b>Note:</b> {avg_rating}</p>
+                    <p>{restaurant_data['address']}</p>
+                </div>
+                """
+                
+                folium.Marker(
+                    location=[lat, lon],
+                    popup=folium.Popup(popup_content, max_width=300),
+                    icon=folium.Icon(color=get_color(avg_rating), icon="cutlery")
+                ).add_to(m)
+                
+                folium_static(m, width=500, height=360)
+
+            with col_details:
+                st.subheader("ℹ️ Informations")
+                st.markdown(f"**Adresse:**  \n{restaurant_data['address']}")
+                st.markdown(f"**Ville:** {restaurant_data['ville']}, {restaurant_data['country']}")
+                
+                st.markdown("**Liens:**")
+                st.markdown(f"👉 [Voir sur TripAdvisor](https://www.tripadvisor.fr/{restaurant_data['restaurant_url']})")
+                
+                if 'restaurant_about' in restaurant_data and restaurant_data['restaurant_about']:
+                    st.markdown("**À propos:**")
+                    st.caption(restaurant_data['restaurant_about'])
+            
+            st.divider()
+            
+            # --- UPDATE SECTION MOVED HERE AS EXPANDER ---
+            with st.expander("⚙️ Options de Mise à Jour (Scraping)"):
+                tab_info1, tab_info2 = st.tabs(["Info Technique", "Mettre à jour"])
+                
+                with tab_info1:
+                    st.write(f"**First Comment Date:** {reviews_info['first_comment_date'].iloc[0] if not reviews_info.empty else 'N/A'}")
+                    st.write(f"**Last Comment Date:** {reviews_info['last_comment_date'].iloc[0] if not reviews_info.empty else 'N/A'}")
+
                 st.warning("**Attention**: Les avis seront écrasés dans la base de données lors de la mise à jour.")
                 try:
                     if not restaurant_name:
