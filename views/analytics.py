@@ -17,6 +17,10 @@ from utils.functions import (
     generate_sentiments_analysis,
     generate_word_frequencies_chart,
     generate_spider_plot,
+    generate_evolution_chart,
+    generate_rating_distribution_chart,
+    generate_ngrams_chart,
+    generate_pos_distribution_chart
 )
 
 
@@ -105,331 +109,122 @@ def get_filtered_restaurant(df, selected_names, names, relevance):
 
 
 def analytics_page(df):
-    """Page d'analyse des restaurants."""
+    """Page d'analyse des restaurants (Dashboard)."""
 
-    # Création des onglets
-    home, sentiment_analysis, word_freq_analysis, simil_anaysis = st.tabs(
-        [
-            "Faire une analyse",
-            "Analyse de sentiments",
-            "Wordcloud",
-            "Analyse de similarité",
-        ]
-    )
-    with home:
-        st.title("Analytiques")
-        st.markdown(
-            """
-            Ici, vous pouvez effectuer différents types d'analyse sur les restaurants :
-            - Analyse des sentiments
-            - Nuage de mots et fréquences des mots
-            - Analyse des similarités avec Word2Vec
+    st.title("Tableau de Bord Analytique 📊")
+    st.markdown("Vue d'ensemble des performances et des sentiments des restaurants.")
 
-            A chaque onglet correspondant à l'analyse que vous souhaitez faire, vous pourrez sélectionner, à partir
-            de filtres (type de cuisine, fourchette de prix), les restaurants que vous désirez soumettre à l'analyse.
-
-            Bonne exploration ! 🔥
-            """
-        )
-
-    ################################################################
-    # SENTIMENT ANALYSIS
-    ################################################################
-
-    with sentiment_analysis:
-        TAB_TITLE = "Analyse de sentiments"
-        st.title(TAB_TITLE)
-        st.write(
-            "ℹ️ Vise à caractériser chaque restaurant à partir des sentiments véhiculés dans les avis des clients."
-        )
-
+    # Keeping filters at the top level
+    with st.expander("Filtres et Sélection", expanded=True):
+        TAB_TITLE = "Dashboard"
         selected_names, names = restaurant_filters(df, TAB_TITLE)
-
-        relevance = st.checkbox("Analyse des avis les plus pertinents ?", value=False,
-                                help="Seuls les avis émis par des internautes ayant un volume de contribution supérieur à la médiane seront pris en compte lors de l'analyse.",
+        relevance = st.checkbox("Avis pertinents uniquement (Top contributeurs)", value=False,
+                                help="Seuls les avis des contributeurs au-dessus de la médiane sont inclus.",
                                 key=f"relevant_only_{TAB_TITLE}")
 
-        st.divider()
-        # Afficher la sélection filtrée
-        if st.button("Démarrer l'analyse", key=f"start_analysis_{TAB_TITLE}"):
-            with st.spinner(
-                "Acquisition et pré-traitement des données sélectionnées... ⏳"
-            ):
-                filtered_df = get_filtered_restaurant(df, selected_names, names, relevance)
-                filtered_df = clean_text_df(filtered_df)
-                # analysis_filtered.analytics_filtered_page(filtered_df)
-
-            with st.spinner("Analyse des sentiments en cours... ⏳"):
-                emotions_par_resto, scatter_plot = generate_sentiments_analysis(
-                    filtered_df
-                )
-                st.plotly_chart(scatter_plot, use_container_width=False)
-
-                # Séparation des graphiques
-                st.divider()
-                st.write("")
-
-                # Analyses des émotions par restaurant
-                spider_plot = generate_spider_plot(emotions_par_resto)
-                st.plotly_chart(spider_plot, use_container_width=False)
-
-    ################################################################
-    # WORDCLOUD
-    ################################################################
-
-    with word_freq_analysis:
-        TAB_TITLE = "Nuage de mots"
-        st.title(TAB_TITLE)
-        st.write(
-            "ℹ️ Vise à représenter les mots les plus fréquents dans les avis des restaurants sélectionnés."
-        )
-
-        selected_names, names = restaurant_filters(df, TAB_TITLE)
-        with st.expander("Options de personnalisation"):
-            ignored_words_input = st.text_area("Entrez les mots que vous souhaitez ignorer (séparés par des espaces)")
-            ignored_words = ignored_words_input.split() if ignored_words_input else []
-            highlighted_words = st.text_area("Entrez les mots que vous souhaitez mettre en avant (séparés par des espaces)")
-
-        relevance = st.checkbox("Analyse des avis les plus pertinents ?", value=False,
-                                help="Seuls les avis émis par des internautes ayant un volume de contribution supérieur à la médiane seront pris en compte lors de l'analyse.",
-                                key=f"relevant_only_{TAB_TITLE}")
-
-        st.divider()
-        # Afficher la sélection filtrée
-        if st.button("Démarrer l'analyse", key=f"start_analysis_{TAB_TITLE}"):
-            with st.spinner(
-                "Acquisition et pré-traitement des données sélectionnées... ⏳"
-            ):
-                filtered_df = get_filtered_restaurant(df, selected_names, names, relevance)
-                filtered_df = clean_text_df(filtered_df)
-
-            with st.spinner("Création du nuage de mots en cours... ⏳"):
-                bad_reviews = filtered_df[filtered_df['rating'].isin([1, 2])]
-                neutral_reviews = filtered_df[filtered_df['rating'] == 3]
-                good_reviews = filtered_df[filtered_df['rating'].isin([4, 5])]
-                
-                # Description du DataFrame
-                total_reviews = len(filtered_df)
-                unique_restaurants = filtered_df["restaurant_id"].nunique()
-                avg_reviews_per_restaurant = filtered_df.groupby("restaurant_name")["rating"].mean().round(1)
-                reviews_per_restaurant = filtered_df.groupby("restaurant_name")["rating"].count().round(1)
-
-                st.write(f"Nombre total d'avis : {total_reviews}")
-                st.write(f"Nombre de restaurants uniques analysés : {unique_restaurants}")
-                colavg, colcount = st.columns(2)
-                with colavg:
-                    st.write("**Note moyenne par restaurant :**")
-                    st.write(avg_reviews_per_restaurant)
-                    
-                with colcount:
-                    st.write("**Nombre total d'avis par restaurant :**")
-                    st.write(reviews_per_restaurant)
-                # Afficher les nuages de mots pour chaque catégorie
-                col1, col2 = st.columns(2)
-                if not bad_reviews.empty:
-                    with col1:
-                            st.subheader(f"Nuage de mots des avis négatifs ({len(bad_reviews)} avis)")
-                            bad_wordcloud = generate_wordcloud(bad_reviews, ignored_words)
-                            plt.figure(figsize=(10, 5))
-                            plt.imshow(bad_wordcloud, interpolation="bilinear")
-                            plt.axis("off")
-                            plt.show()
-                            st.pyplot(plt)
-                            
-                    with col2:
-                            bar_chart, total_words = generate_word_frequencies_chart(bad_reviews, ignored_words, color="red")
-                            st.write(f"Nombre total de mots : {total_words}")
-                            st.altair_chart(bar_chart, use_container_width=True)
-                            
-                col3, col4 = st.columns(2)
-                
-                if not neutral_reviews.empty:
-                    with col3:
-                            st.subheader(f"Nuage de mots des avis neutres ({len(neutral_reviews)} avis)")
-                            neutral_wordcloud = generate_wordcloud(neutral_reviews, ignored_words,)
-                            plt.figure(figsize=(10, 5))
-                            plt.imshow(neutral_wordcloud, interpolation="bilinear")
-                            plt.axis("off")
-                            plt.show()
-                            st.pyplot(plt)
-                            
-                    with col4:
-                            bar_chart, total_words = generate_word_frequencies_chart(neutral_reviews, ignored_words, color="grey")
-                            st.write(f"Nombre total de mots : {total_words}")
-                            st.altair_chart(bar_chart, use_container_width=True)
-
-                col5, col6 = st.columns(2)
-                if not good_reviews.empty:
-                    with col5:
-                            st.subheader(f"Nuage de mots des avis positifs ({len(good_reviews)} avis)")
-                            good_wordcloud = generate_wordcloud(good_reviews, ignored_words)
-                            plt.figure(figsize=(10, 5))
-                            plt.imshow(good_wordcloud, interpolation="bilinear")
-                            plt.axis("off")
-                            plt.show()
-                            st.pyplot(plt)
-                    with col6:  
-                            bar_chart, total_words = generate_word_frequencies_chart(good_reviews, ignored_words, color="green")
-                            st.write(f"Nombre total de mots : {total_words}")
-                            st.altair_chart(bar_chart, use_container_width=True)
-                            
-                if highlighted_words:
-                    colword, colword2 = st.columns(2)
-                    with colword:
-                        st.write("Mots mis en avant :")
-                        st.write(highlighted_words)
-                        
-                        def filter_highlighted_words(reviews, highlighted_words):
-                            text_joined = " ".join(reviews["cleaned_text"])
-                            text_joined = text_joined.lower()
-                            text_joined = text_joined.split(" ")
-                            filtered_highlighted_words = [word for word in text_joined if word in highlighted_words]
-                            filtered_highlighted_words = [word for word in filtered_highlighted_words if len(word) > 1]
-                            return filtered_highlighted_words
-                        
-                        bad_highlighted_words = filter_highlighted_words(bad_reviews, highlighted_words)
-                        neutral_highlighted_words = filter_highlighted_words(neutral_reviews, highlighted_words)
-                        good_highlighted_words = filter_highlighted_words(good_reviews, highlighted_words)
-                        
-                        wordcloud = WordCloud(width=800, height=400, background_color="white").generate(
-                            " ".join(bad_highlighted_words + neutral_highlighted_words + good_highlighted_words)
-                        )
-                        plt.figure(figsize=(10, 5))
-                        plt.imshow(wordcloud, interpolation="bilinear")
-                        plt.axis("off")
-                        st.pyplot(plt)
-                        
-                    with colword2:
-                        import pandas as pd
-                        word_counts = Counter(bad_highlighted_words + neutral_highlighted_words + good_highlighted_words)
-                        word_counts_df = pd.DataFrame(word_counts.items(), columns=["word", "count"])
-                        word_counts_df["bad_count"] = word_counts_df["word"].apply(lambda x: bad_highlighted_words.count(x))
-                        word_counts_df["neutral_count"] = word_counts_df["word"].apply(lambda x: neutral_highlighted_words.count(x))
-                        word_counts_df["good_count"] = word_counts_df["word"].apply(lambda x: good_highlighted_words.count(x))
-
-                        bar_chart = alt.Chart(word_counts_df).transform_fold(
-                            ["bad_count", "neutral_count", "good_count"],
-                            as_=["Sentiment", "Count"]
-                        ).mark_bar().encode(
-                            y=alt.Y("word", sort="-x"),
-                            x="Count:Q",
-                            color=alt.Color("Sentiment:N", scale=alt.Scale(domain=["bad_count", "neutral_count", "good_count"], range=["red", "grey", "green"]))
-                        ).properties(
-                            width=600,
-                            height=400
-                        )
-
-                        st.altair_chart(bar_chart, use_container_width=True)
-                        
-
-    ################################################################
-    # WORD2VEC
-    ################################################################
-
-    with simil_anaysis:
-        TAB_TITLE = "Analyse des similarités"
-        st.title(TAB_TITLE)
-        st.markdown(
-            'ℹ️ Vise à représenter une "similarité" entre les restaurants à partir de la sémantique des avis des clients.  \n'
-            + 'ℹ️ Plus deux restaurants sont proches, plus ils peuvent être interprétés comme "similaires" sur des facteurs comme :  \n'
-            + "ℹ️ la proximité géographique, de l'expérience utilisateur, du type de cuisine, du prix, etc."
-        )
-
-        selected_names, names = restaurant_filters(df, TAB_TITLE)
-
-        # col1, col2, col3 = st.columns(3)
-        col1, col2 = st.columns(2)
-        with col1:
-            relevance = st.checkbox("Analyse des avis les plus pertinents ?", value=False,
-                                    help="Seuls les avis émis par des internautes ayant un volume de contribution supérieur à la médiane seront pris en compte lors de l'analyse.",
-                                    key=f"relevant_only_{TAB_TITLE}")
-        with col2:
-            three_dim = st.checkbox("Analyse en 3D ? ", value=False)
-        # with col3:
-        #     analysis_type = st.selectbox("Où mettre l'accent pour l'analyse ?", options=["Type de cuisine", "Fourchette de prix"])
+    if st.button("Actualiser le Tableau de Bord", type="primary", key="refresh_dashboard"):
+        with st.spinner("Analyse en cours... ⏳"):
+            filtered_df = get_filtered_restaurant(df, selected_names, names, relevance)
+            filtered_df = clean_text_df(filtered_df)
             
-        st.divider()
-        # Afficher la sélection filtrée
-        if st.button("Démarrer l'analyse", key=f"start_analysis_{TAB_TITLE}"):
-            with st.spinner(
-                "Acquisition et pré-traitement des données sélectionnées... ⏳"
-            ):
-                filtered_df = get_filtered_restaurant(df, selected_names, names, relevance)
-                if three_dim and len(filtered_df["restaurant_id"].unique()) < 3:
-                    st.warning("Veuillez sélectionner au moins trois restaurants.")
-                    st.stop()
-                elif not three_dim and len(filtered_df["restaurant_id"].unique()) < 2:
-                    st.warning("Veuillez sélectionner au moins deux restaurants.")
-                    st.stop()
-                filtered_df = clean_text_df(filtered_df)
+            # --- CALCUL DES KPIs ---
+            total_reviews = len(filtered_df)
+            avg_rating = filtered_df["rating"].mean()
+            
+            # Generate sentiment analysis first to get 'sentiment' column
+            emotions_par_resto, scatter_plot = generate_sentiments_analysis(filtered_df)
+            avg_sentiment = filtered_df["sentiment"].mean()
+            
+            num_restaurants = filtered_df["restaurant_id"].nunique()
 
-            with st.spinner("Analyse des similarités en cours... ⏳"):
-                restaurant_coords, restaurant_names = generate_word2vec(
-                    filtered_df, three_dim
-                )
-                # if analysis_type == "Type de cuisine":
-                #     classes = restaurant_info_supp["restaurant_type"]
-                # else: # analysis_type == "Fourchette de prix"
-                #     classes = restaurant_info_supp["restaurant_price"]
+            # --- AFFICHAGE DES KPIs ---
+            kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+            kpi1.metric("Nombre d'Avis", total_reviews)
+            kpi2.metric("Note Moyenne", f"{avg_rating:.2f}/5")
+            kpi3.metric("Score Sentiment", f"{avg_sentiment:.2f}", help="De -1 (Négatif) à +1 (Positif)")
+            kpi4.metric("Restaurants", num_restaurants)
+
+            st.divider()
+
+            # --- GRAPHIQUES LIGNE 1 : Evolution & Distribution ---
+            st.subheader("Tendances et Distribution")
+            row1_col1, row1_col2 = st.columns(2)
+            
+            with row1_col1:
+                st.markdown("#### 📅 Évolution Temporelle")
+                evolution_chart = generate_evolution_chart(filtered_df)
+                st.altair_chart(evolution_chart, use_container_width=True)
                 
-                # Create a new figure for the scatter plot
-                fig = go.Figure()
+            with row1_col2:
+                st.markdown("#### ⭐ Distribution des Notes")
+                dist_chart = generate_rating_distribution_chart(filtered_df)
+                st.altair_chart(dist_chart, use_container_width=True)
 
-                if three_dim:
-                    # Ajout des points de scatter
-                    fig.add_trace(
-                        go.Scatter3d(
-                            x=restaurant_coords[:, 0],
-                            y=restaurant_coords[:, 1],
-                            z=restaurant_coords[:, 2],
-                            mode="markers+text",
-                            marker=dict(
-                                size=10, 
-                                color="blue"
-                                ),
-                            text=restaurant_names,
-                            textposition="top center",
-                            hoverinfo="text",
-                        )
-                    )
+            st.divider()
 
-                    # Mise à jour du layout
-                    fig.update_layout(
-                        title="Représentation des restaurants basée sur les avis (ACP)",
-                        scene=dict(
-                            xaxis_title="Dimension 1",
-                            yaxis_title="Dimension 2",
-                            zaxis_title="Dimension 3",
-                        ),
-                        width=800,
-                        height=600,
-                    )
+            # --- GRAPHIQUES LIGNE 2 : Sentiment vs Note & Emotions ---
+            st.subheader("Analyse Approfondie")
+            row2_col1, row2_col2 = st.columns(2)
+            
+            with row2_col1:
+                st.markdown("#### 🙂 Sentiment vs Note")
+                st.plotly_chart(scatter_plot, use_container_width=True)
+                
+            with row2_col2:
+                st.markdown("#### 🎭 Radar des Émotions")
+                spider_plot = generate_spider_plot(emotions_par_resto)
+                st.plotly_chart(spider_plot, use_container_width=True)
 
-                else:
-                    # Ajout des points de scatter
-                    fig.add_trace(
-                        go.Scatter(
-                            x=restaurant_coords[:, 0],
-                            y=restaurant_coords[:, 1],
-                            mode="markers+text",
-                            marker=dict(
-                                size=10, 
-                                color="blue"
-                                ),
-                            text=restaurant_names,
-                            textposition="top center",
-                            hoverinfo="text",
-                        )
-                    )
+            # --- ANALYSES TEXTUELLES (NLP) ---
+            st.divider()
+            st.subheader("Analyses Textuelles Avancées (NLP)")
+            
+            row3_col1, row3_col2 = st.columns(2)
+            
+            with row3_col1:
+                st.markdown("#### 🗣️ Expressions Fréquentes (Bigrammes)")
+                ngram_chart = generate_ngrams_chart(filtered_df, n=2)
+                st.altair_chart(ngram_chart, use_container_width=True)
+                
+            with row3_col2:
+                st.markdown("#### 📝 Grammaire (Adjectifs vs Noms)")
+                pos_chart = generate_pos_distribution_chart(filtered_df)
+                st.altair_chart(pos_chart, use_container_width=True)
+                
+            st.markdown("#### ☁️ Nuage de Mots")
+            # Wordcloud is matplotlib figure
+            ignored_words = [] # Could add filter input if needed
+            wc = generate_wordcloud(filtered_df, ignored_words)
+            fig_wc = plt.figure(figsize=(10, 5))
+            plt.imshow(wc, interpolation="bilinear")
+            plt.axis("off")
+            st.pyplot(fig_wc)
 
-                    # Mise à jour du layout
-                    fig.update_layout(
-                        title="Représentation des restaurants basée sur les avis (ACP)",
-                        xaxis_title="Dimension 1",
-                        yaxis_title="Dimension 2",
-                        width=800,
-                        height=600,
-                    )
+            st.divider()
 
-                # Affichage du graphique dans Streamlit
-                st.plotly_chart(fig)
+            # --- DERNIERS AVIS ---
+            st.subheader("Derniers Avis Analysés")
+            # Sort by date if available, otherwise just take head
+            if 'date' in filtered_df.columns:
+                recent_reviews = filtered_df.sort_values(by='date', ascending=False).head(5)
+            else:
+                recent_reviews = filtered_df.head(5)
+            
+            for index, row in recent_reviews.iterrows():
+                with st.container():
+                     cols = st.columns([1, 4])
+                     with cols[0]:
+                         st.write(f"**{row['rating']} ⭐**")
+                         sentiment_score = row.get('sentiment', 0)
+                         if sentiment_score > 0.05:
+                             st.caption("🟢 Positif")
+                         elif sentiment_score < -0.05:
+                             st.caption("🔴 Négatif")
+                         else:
+                             st.caption("⚪ Neutre")
+                     with cols[1]:
+                         st.write(f"_{row['restaurant_name']}_")
+                         st.write(f"\"{row['review_text'][:300]}...\"")
+                         st.caption(f"Date: {row.get('date', 'N/A')}")
+                st.markdown("---")
+

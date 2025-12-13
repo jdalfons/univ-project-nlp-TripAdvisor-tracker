@@ -370,29 +370,42 @@ def get_restaurant_by_id(restaurant_ids):
     if conn is None:
         return pd.DataFrame()
     try:
-        # SQLite doesn't support %s list expansion directly like psycopg2
-        placeholders = ','.join(['?'] * len(restaurant_ids))
-        query = f"""
-            SELECT 
-                r.restaurant_id,
-                r.restaurant_name,
-                r.restaurant_avg_review,
-                r.restaurant_type,
-                r.restaurant_price,
-                l.latitude,
-                l.longitude,
-                r2.rating,
-                r2.review_text,
-                r2.contributions 
-            FROM restaurants r
-            JOIN locations l ON l.restaurant_id = r.restaurant_id
-            JOIN reviews r2 ON r2.restaurant_id = r.restaurant_id 
-            WHERE r.restaurant_id IN ({placeholders})
-        """
-        restaurants = conn.execute(query, restaurant_ids).fetchall()
-        return pd.DataFrame([dict(restaurant) for restaurant in restaurants])
+        if not restaurant_ids:
+            return pd.DataFrame()
+
+        # Chunk the IDs to avoid SQLite limit (usually 999 variables)
+        chunk_size = 900
+        all_restaurants = []
+        
+        for i in range(0, len(restaurant_ids), chunk_size):
+            chunk = restaurant_ids[i:i + chunk_size]
+            placeholders = ','.join(['?'] * len(chunk))
+            
+            query = f"""
+                SELECT 
+                    r.restaurant_id,
+                    r.restaurant_name,
+                    r.restaurant_avg_review,
+                    r.restaurant_type,
+                    r.restaurant_price,
+                    l.latitude,
+                    l.longitude,
+                    r2.rating,
+                    r2.review_text,
+                    r2.contributions,
+                    r2.date
+                FROM restaurants r
+                JOIN locations l ON l.restaurant_id = r.restaurant_id
+                JOIN reviews r2 ON r2.restaurant_id = r.restaurant_id 
+                WHERE r.restaurant_id IN ({placeholders})
+            """
+            
+            restaurants_chunk = conn.execute(query, chunk).fetchall()
+            all_restaurants.extend(restaurants_chunk)
+            
+        return pd.DataFrame([dict(restaurant) for restaurant in all_restaurants])
     except sqlite3.Error as err:
-        print(err)
+        print(f"Error in get_restaurant_by_id: {err}")
         return pd.DataFrame()
     finally:
         conn.close()
