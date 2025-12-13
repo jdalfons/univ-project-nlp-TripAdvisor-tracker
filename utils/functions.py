@@ -14,12 +14,27 @@ from gensim.models import Word2Vec
 from collections import Counter
 import altair as alt
 import requests
-from nrclex import NRCLex  # Add this import
+from nrclex import NRCLex
+from nltk.util import ngrams
+from nltk import pos_tag
+
+nltk.download('averaged_perceptron_tagger_eng')
+from nltk.util import ngrams
+from nltk import pos_tag  # Add this import
 
 nltk.download("punkt")
 nltk.download("punkt_tab")
 nltk.download("wordnet")
+nltk.download("punkt")
+nltk.download("punkt_tab")
+nltk.download("wordnet")
 nltk.download("stopwords")
+nltk.download('averaged_perceptron_tagger_eng') # For POS tagging (English by default, but we might need French tagger or mapping)
+# Note: NLTK's default pos_tag is for English. For French, we usually need 'averaged_perceptron_tagger' 
+# or a specific French model. However, 'pos_tag' uses Penn Treebank tagset which is English-centric.
+# For simplicity in this demo, we might rely on simple split or if user has french setup. 
+# Let's assume standard pos_tag for now or check if we need spacy. 
+# Given the environment, let's try standard NLTK pos_tag (it might be approximate for French but shows the concept).
 from nltk.corpus import stopwords
 
 
@@ -167,6 +182,13 @@ def clean_text_df(df: pd.DataFrame, root_type: str = "lemmatization") -> pd.Data
                 if word.lower() not in stop_words
             ]
         return " ".join(tokens)
+
+    # Drop rows where 'review_text' is NaN or None
+    df = df.dropna(subset=['review_text'])
+    
+    # Ensure date column is datetime
+    if "date" in df.columns:
+        df["date"] = pd.to_datetime(df["date"], errors='coerce')
 
     df["cleaned_text"] = df["review_text"].apply(lambda x: process_text(x))
 
@@ -528,3 +550,143 @@ def get_coordinates(address, api_key):
     else:
         return None
             
+            
+def generate_evolution_chart(df: pd.DataFrame) -> alt.Chart:
+    """
+    Generate a time-series chart showing the evolution of sentiment and rating over time.
+    """
+    # Ensure date is datetime
+    if not pd.api.types.is_datetime64_any_dtype(df['date']):
+         df['date'] = pd.to_datetime(df['date'], errors='coerce')
+
+    # Aggregating by month for smoother lines
+    evolution = df.set_index('date').resample('M').agg({
+        'sentiment': 'mean',
+        'rating': 'mean',
+        'review_text': 'count'
+    }).reset_index()
+    
+    # Rename for tooltip
+    evolution = evolution.rename(columns={'review_text': 'review_count'})
+
+    # Create base chart
+    base = alt.Chart(evolution).encode(x=alt.X('date:T', title='Date'))
+
+    # Line for Rating (scaled to fit with sentiment if needed, or separate axes)
+    # Using dual axis might be complex in simple altair, so let's normalize or just show sentiment
+    # Let's show Sentiment on left, Rating on right? Or just two lines on different scales?
+    # For simplicity and readability on a dashboard, let's stick to SENTIMENT evolution primarily, 
+    # as that's the "Analytics" focus.
+    
+    line_sentiment = base.mark_line(color='#FF4B4B').encode(
+        y=alt.Y('sentiment:Q', title='Sentiment Moyen'),
+        tooltip=['date:T', alt.Tooltip('sentiment', format='.2f'), 'review_count']
+    )
+    
+    points = base.mark_circle(color='#FF4B4B').encode(
+        y='sentiment:Q',
+        tooltip=['date:T', alt.Tooltip('sentiment', format='.2f'), 'review_count']
+    )
+
+    chart = (line_sentiment + points).properties(
+        title="Évolution du Sentiment au Fil du Temps (Mensuel)",
+        width=600,
+        height=300
+    ).interactive()
+
+    return chart
+
+
+def generate_rating_distribution_chart(df: pd.DataFrame) -> alt.Chart:
+    """
+    Generate a bar chart showing the distribution of ratings (1-5 stars).
+    """
+    rating_counts = df['rating'].value_counts().sort_index().reset_index()
+    rating_counts.columns = ['rating', 'count']
+
+    chart = alt.Chart(rating_counts).mark_bar(color='#0068C9').encode(
+        x=alt.X('rating:O', title='Note (Etoiles)'),
+        y=alt.Y('count:Q', title='Nombre d\'avis'),
+        tooltip=['rating', 'count']
+    ).properties(
+        title="Distribution des Notes",
+        width=400,
+        height=300
+    )
+    
+    return chart
+
+
+def generate_ngrams_chart(df: pd.DataFrame, n: int = 2) -> alt.Chart:
+    """
+    Generate a bar chart of the most frequent n-grams in the cleaned text.
+    """
+    text = " ".join(df["cleaned_text"].dropna())
+    tokens = text.split()
+    
+    # Generate n-grams
+    n_grams = list(ngrams(tokens, n))
+    
+    # Count frequencies
+    ngram_counts = Counter(n_grams)
+    
+    # Create DataFrame
+    ngram_df = pd.DataFrame(ngram_counts.items(), columns=['ngram', 'count'])
+    ngram_df['ngram_str'] = ngram_df['ngram'].apply(lambda x: ' '.join(x))
+    
+    # Get top 15
+    ngram_df = ngram_df.nlargest(15, 'count')
+    
+    title_map = {2: "Bigrammes (2 mots)", 3: "Trigrammes (3 mots)"}
+    
+    chart = alt.Chart(ngram_df).mark_bar(color='#E15759').encode(
+        x=alt.X('count:Q', title='Fréquence'),
+        y=alt.Y('ngram_str:N', sort='-x', title='Expression'),
+        tooltip=['ngram_str', 'count']
+    ).properties(
+        title=f"Expressions Fréquentes - {title_map.get(n, f'{n}-grams')}",
+        width=400,
+        height=300
+    )
+    
+    return chart
+
+def generate_pos_distribution_chart(df: pd.DataFrame) -> alt.Chart:
+    """
+    Generate a chart showing top Adjectives and Nouns using NLTK POS tagging.
+    """
+    text = " ".join(df["cleaned_text"].dropna())
+    tokens = word_tokenize(text) # Simple tokenization
+    
+    # Attempt POS tagging 
+    tagged = pos_tag(tokens)
+    
+    # Filter for Adjectives (JJ) and Nouns (NN)
+    adjectives = [word for word, tag in tagged if tag.startswith('JJ')]
+    nouns = [word for word, tag in tagged if tag.startswith('NN')]
+    
+    # Count top 10 of each
+    top_adj = Counter(adjectives).most_common(10)
+    top_noun = Counter(nouns).most_common(10)
+    
+    # Prepare DF
+    adj_df = pd.DataFrame(top_adj, columns=['word', 'count'])
+    adj_df['type'] = 'Adjectif'
+    
+    noun_df = pd.DataFrame(top_noun, columns=['word', 'count'])
+    noun_df['type'] = 'Nom'
+    
+    combined_df = pd.concat([adj_df, noun_df])
+    
+    chart = alt.Chart(combined_df).mark_bar().encode(
+        x=alt.X('count:Q', title='Fréquence'),
+        y=alt.Y('word:N', sort='-x', title='Mot'),
+        color=alt.Color('type:N', scale=alt.Scale(scheme='tableau10')),
+        tooltip=['word', 'count', 'type']
+    ).properties(
+        title="Top Adjectifs et Noms (Approximation)",
+        width=400,
+        height=300
+    )
+    
+    return chart
