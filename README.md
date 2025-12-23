@@ -1,95 +1,89 @@
-# Scraper NLP Tripadvisor
+# Scraper NLP TripAdvisor
 
-This project demonstrates the use of NLP practices by deploying analysis and models. It focuses on scraping reviews from Tripadvisor based on user feedback.
+This project demonstrates the application of Natural Language Processing (NLP) techniques to analyze restaurant reviews from TripAdvisor. It features a complete pipeline from data scraping to an interactive analytics dashboard and an AI-powered chat assistant.
+
+## Features
+
+-   **Data Scraping**: Automated scraping of restaurant reviews using BeautifulSoup.
+-   **Sentiment Analysis**: LLM-based analysis of reviews to identify positive and negative points.
+-   **Interactive Dashboard**: Visual analytics of review distribution, sentiment evolution, and key metrics using Streamlit.
+-   **RAG Chatbot**: Chat with your data using Retrieval-Augmented Generation powered by Mistral AI.
+-   **Geospatial Analysis**: Interactive map to explore restaurant locations and metrics.
 
 ## Architecture
 
-A scraper (BeautifulSoup) is used to gather restaurant data from all review pages. These reviews are saved into a SQLite database file, which is accessed by a Python backend. The data is then displayed on a Streamlit frontend for analysis. Additionally, an LLM from Mistral AI is used to summarize each restaurant's positive and negative points based on the comments.
+A scraper (BeautifulSoup) gathers restaurant data, which is stored in a SQLite database. A Python backend serves this data to a Streamlit frontend. Mistral AI is integrated for advanced NLP tasks.
 
 ![Architecture Diagram](assets/img/architecture.png)
 
-## DataBase
-The database follows a star schema, dividing locations, reviews, and restaurant information into separate tables. For improvement, consider adding another table for users instead of saving user information in the reviews table.
+## Database
 
-The default SQLite file is stored at `sql/tripadvisor.db`. When the application starts for the first time it creates the schema and loads the demo dataset using the SQL scripts available in the `sql/` directory.
+The database follows a star schema, separating locations, reviews, and restaurant details.
 
 ![UML](assets/img/nlp_sql_uml.png)
 
-# How to Set Up
+## Prerequisites
 
-## API Keys Setup
+-   Python 3.10+
+-   Docker & Docker Compose (optional for containerized deployment)
+-   API Keys:
+    -   [Mistral AI](https://console.mistral.ai/)
+    -   [Google Maps Platform](https://developers.google.com/maps) (for map features)
 
-You can configure the API keys in two ways:
+## Configuration
 
-### 1. Local Environment Variables
-
-Docker will take local variables from your environment file or machine. You can configure it using an `.env` file like the following:
+Create a file named `.env` in the root directory with your API keys:
 
 ```sh
 SQLITE_PATH=sql/tripadvisor.db
-
-MISTRAL_URL=http://mistralservice:8501
-MISTRAL_API_KEY=${MISTRAL_API_KEY}
-GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+MISTRAL_API_KEY=your_mistral_api_key_here
+GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
 ```
 
-`SQLITE_PATH` can be an absolute path or a relative path inside the project. When the file is missing, the application will create it automatically and seed it with the demo dataset.
+## Installation & Setup
 
-### 2. Direct Modification
+### Option 1: Docker (Recommended)
 
-Before starting, you need API keys from different services. Follow the steps below to obtain and configure the necessary keys.
+Run the application in a containerized environment:
 
-Ensure your `docker-compose` file includes the following environment variables:
-```yaml
-environment:
-    - SQLITE_PATH=/app/sql/tripadvisor.db
-    - MISTRAL_API_KEY=${MISTRAL_API_KEY}
-    - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+```bash
+docker-compose up --build -d
 ```
 
+The app will be available at `http://localhost:8502`.
 
-### Mistral AI
+To stop the application:
 
-1. **Create an account:**
-    If you don't have an account, register at [Mistral AI](https://auth.mistral.ai/ui/registration).
+```bash
+docker-compose down
+```
 
-2. **Add billing information:**
-    Go to [Mistral AI Billing](https://console.mistral.ai/billing/) and follow the instructions to add your billing information and credit balance.
+### Option 2: Local Setup
 
-3. **Generate an API key:**
-    Visit [Mistral AI API Keys](https://console.mistral.ai/user/api-keys/) and click "Generate a new key". Copy the key and add it to your environment variables. If you are using a Unix-based OS, you can add it to your local environment variables with the name `MISTRAL_API_KEY`, and Docker will automatically use it. Alternatively for Windows users, you can directly replace `${MISTRAL_API_KEY}` in the `docker-compose` file.
-
-### Google Maps
-
-1. **Get an API key:**
-    Follow the instructions at [Google Maps API](https://developers.google.com/maps/documentation/javascript/get-api-key) to obtain your API key.
-
-2. **Configure the API key:**
-    Add the key to your environment variables. If you are using a Unix-based OS, you can add it to your local environment variables with the name `GOOGLE_MAPS_API_KEY`, and Docker will automatically use it. Alternatively, for Windows users, you can directly replace `${GOOGLE_MAPS_API_KEY}` in the `docker-compose` file.
-
-1. **Clone the repository:**
+1.  **Create a virtual environment:**
     ```bash
-    git clone https://github.com/yourusername/NLP-TripAdvisor.git
-    cd NLP-TripAdvisor
+    python -m venv venv
     ```
-    Ensure you have Docker installed and run:
 
-2. **Docker setup:**
+2.  **Activate the environment:**
+    -   **Mac/Linux:**
+        ```bash
+        source venv/bin/activate
+        ```
+    -   **Windows:**
+        ```bash
+        venv\Scripts\activate
+        ```
+
+3.  **Install dependencies:**
     ```bash
-    docker-compose up --build -d
+    pip install -r requirements.txt
     ```
 
-4. **Access the web application:**
-    The application will be available at `http://localhost:8502`
-
-5. **Close the Docker Image**
-   When you are done with the webb app, you can do this command on your terminal.
-   ```bash
-    docker-compose down
+4.  **Run the application:**
+    ```bash
+    streamlit run app.py
     ```
-
-### Local set up
-Install your favorite
 
 ## Collaborators
 
